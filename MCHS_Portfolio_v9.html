@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCHS | Silos_Engineering_OS_v9</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --win-bg: #008080;
+    --win-face: #d4d0c8;
+    --win-dark: #808080;
+    --win-darker: #404040;
+    --win-light: #ffffff;
+    --win-border-dark: #0a0a0a;
+    --win-title-from: #000080;
+    --win-title-to: #1084d0;
+    --win-title-inactive: #7b7b7b;
+    --win-btn: #d4d0c8;
+    --text: #000;
+    --font: 'MS Sans Serif', 'Segoe UI', Tahoma, sans-serif;
+    --font-mono: 'VT323', 'Courier New', monospace;
+    --accent-gold: #ffd700;
+    --accent-cyan: #00ffff;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    font-family: var(--font);
+    font-size: 11px;
+    background: #000;
+    cursor: default;
+    user-select: none;
+  }
+
+  /* ── BOOT SCREEN ── */
+  #boot-screen {
+    position: fixed; inset: 0;
+    background: #000;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 999999;
+    font-family: 'VT323', monospace;
+    color: #00ff41;
+    overflow: hidden;
+  }
+  #boot-screen.hide {
+    animation: bootFadeOut 0.6s forwards;
+  }
+  @keyframes bootFadeOut {
+    0% { opacity:1; } 100% { opacity:0; pointer-events:none; }
+  }
+  .boot-scanline {
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,65,0.03) 2px,rgba(0,255,65,0.03) 4px);
+    pointer-events: none;
+  }
+  .boot-logo {
+    font-size: 48px; letter-spacing: 6px; color: #00ff41;
+    text-shadow: 0 0 20px #00ff41, 0 0 40px #00ff41;
+    margin-bottom: 8px;
+  }
+  .boot-sub {
+    font-size: 18px; color: #00cc33; letter-spacing: 3px;
+    margin-bottom: 32px;
+  }
+  .boot-log {
+    font-size: 14px; color: #00aa22; text-align: left;
+    min-width: 400px; line-height: 1.8;
+  }
+  .boot-bar-wrap {
+    width: 400px; height: 18px;
+    border: 1px solid #00ff41;
+    margin-top: 20px; overflow: hidden;
+    box-shadow: 0 0 10px #00ff41;
+  }
+  .boot-bar-fill {
+    height: 100%; width: 0%;
+    background: #00ff41;
+    box-shadow: 0 0 8px #00ff41;
+    transition: width 0.1s linear;
+  }
+  .boot-pct {
+    font-size: 14px; color: #00ff41; margin-top: 6px;
+    text-shadow: 0 0 6px #00ff41;
+  }
+
+  /* ── DESKTOP ── */
+  #desktop {
+    position: fixed; inset: 0 0 28px 0;
+    background: var(--win-bg);
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+  }
+  #desktop.show { opacity: 1; }
+
+  /* CRT scanline overlay */
+  #desktop::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* Wallpaper */
+  #desktop {
+    background-image: url("https://i.postimg.cc/vZKsgPzH/image.png") !important;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+  }
+
+  /* Particle canvas */
+  #particle-canvas {
+    position: absolute; inset: 0;
+    pointer-events: none; z-index: 0;
+    opacity: 0.4;
+  }
+
+  /* ── DESKTOP ICONS ── */
+  .desktop-icon {
+    position: absolute;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 2px;
+    width: 72px; cursor: pointer;
+    padding: 4px; border-radius: 2px;
+    transition: background 0.1s, transform 0.15s;
+    z-index: 2;
+  }
+  .desktop-icon:hover { background: rgba(0,0,128,0.25); }
+  .desktop-icon.selected { background: rgba(0,0,128,0.5); outline: 1px dotted white; }
+  .desktop-icon img { width: 32px; height: 32px; image-rendering: pixelated; }
+  .desktop-icon span {
+    color: white; font-size: 11px; text-align: center;
+    line-height: 1.2; text-shadow: 1px 1px 1px #000,-1px -1px 1px #000,1px -1px 1px #000,-1px 1px 1px #000;
+    word-break: break-word;
+  }
+  .desktop-icon.selected span { background: #000080; color: white; }
+
+  /* ── WINDOWS ── */
+  .win {
+    position: absolute;
+    min-width: 280px; min-height: 120px;
+    background: var(--win-face);
+    border-top: 2px solid var(--win-light);
+    border-left: 2px solid var(--win-light);
+    border-right: 2px solid var(--win-darker);
+    border-bottom: 2px solid var(--win-darker);
+    box-shadow: inset 1px 1px 0 var(--win-face),inset -1px -1px 0 var(--win-dark), 4px 6px 18px rgba(0,0,0,0.45);
+    display: none;
+    flex-direction: column;
+    animation: none;
+  }
+  .win.visible { display: flex; animation: winOpen 0.18s cubic-bezier(.21,1.4,.58,1) both; }
+  .win.minimized { display: none !important; }
+  @keyframes winOpen {
+    from { transform: scale(0.88); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+  }
+
+  .win-titlebar {
+    display: flex; align-items: center;
+    height: 18px; padding: 2px 2px 2px 4px;
+    background: linear-gradient(90deg, var(--win-title-from), var(--win-title-to));
+    cursor: move; flex-shrink: 0; gap: 3px;
+    position: relative; overflow: hidden;
+  }
+  /* Shimmer on active titlebar */
+  .win-titlebar::after {
+    content: '';
+    position: absolute; top: 0; left: -60%;
+    width: 50%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+    animation: titleShimmer 3s infinite 1s;
+    pointer-events: none;
+  }
+  @keyframes titleShimmer {
+    0%   { left: -60%; }
+    40%  { left: 120%; }
+    100% { left: 120%; }
+  }
+  .win.inactive .win-titlebar { background: var(--win-title-inactive); }
+  .win.inactive .win-titlebar::after { display: none; }
+
+  .win-icon { width: 14px; height: 14px; image-rendering: pixelated; flex-shrink: 0; }
+  .win-title {
+    flex: 1; color: white; font-weight: bold; font-size: 11px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    pointer-events: none; padding-left: 2px;
+  }
+  .win-btns { display: flex; gap: 2px; flex-shrink: 0; }
+  .win-btn {
+    width: 16px; height: 14px;
+    background: var(--win-btn);
+    border-top: 1px solid var(--win-light);
+    border-left: 1px solid var(--win-light);
+    border-right: 1px solid var(--win-darker);
+    border-bottom: 1px solid var(--win-darker);
+    cursor: pointer; display: flex; align-items: center;
+    justify-content: center; font-size: 9px; font-weight: bold;
+    flex-shrink: 0; transition: filter 0.1s;
+  }
+  .win-btn:hover { filter: brightness(1.1); }
+  .win-btn:active {
+    border-top: 1px solid var(--win-darker);
+    border-left: 1px solid var(--win-darker);
+    border-right: 1px solid var(--win-light);
+    border-bottom: 1px solid var(--win-light);
+  }
+
+  .win-menubar {
+    display: flex; align-items: center; height: 20px;
+    border-bottom: 1px solid var(--win-dark);
+    padding: 0 2px; flex-shrink: 0;
+  }
+  .win-menu-item {
+    padding: 2px 6px; cursor: pointer; font-size: 11px;
+    transition: background 0.1s;
+  }
+  .win-menu-item:hover { background: #000080; color: white; }
+
+  .win-toolbar {
+    display: flex; align-items: center; height: 26px;
+    border-bottom: 1px solid var(--win-dark);
+    padding: 2px 4px; gap: 2px; flex-shrink: 0;
+  }
+  .toolbar-btn {
+    height: 22px; min-width: 22px; padding: 0 4px;
+    background: var(--win-btn);
+    border-top: 1px solid var(--win-light);
+    border-left: 1px solid var(--win-light);
+    border-right: 1px solid var(--win-darker);
+    border-bottom: 1px solid var(--win-darker);
+    cursor: pointer; font-size: 10px;
+    transition: filter 0.1s;
+  }
+  .toolbar-btn:hover { filter: brightness(1.08); }
+  .toolbar-sep { width: 1px; height: 18px; background: var(--win-dark); margin: 0 2px; }
+
+  .win-body {
+    flex: 1; overflow: auto; padding: 8px;
+    background: var(--win-face);
+    font-size: 11px;
+  }
+  .win-body::-webkit-scrollbar { width: 16px; }
+  .win-body::-webkit-scrollbar-track { background: var(--win-face); border-left: 1px solid var(--win-dark); }
+  .win-body::-webkit-scrollbar-thumb {
+    background: var(--win-face);
+    border-top: 1px solid var(--win-light);
+    border-left: 1px solid var(--win-light);
+    border-right: 1px solid var(--win-darker);
+    border-bottom: 1px solid var(--win-darker);
+  }
+
+  .win-statusbar {
+    height: 20px; display: flex; align-items: center;
+    border-top: 1px solid var(--win-dark);
+    padding: 0 6px; flex-shrink: 0; gap: 4px;
+  }
+  .status-panel {
+    flex: 1; height: 14px;
+    border-top: 1px solid var(--win-dark);
+    border-left: 1px solid var(--win-dark);
+    border-right: 1px solid var(--win-light);
+    border-bottom: 1px solid var(--win-light);
+    padding: 0 4px; display: flex; align-items: center;
+    font-size: 10px;
+  }
+
+  .win-resize {
+    position: absolute; bottom: 0; right: 0;
+    width: 16px; height: 16px; cursor: se-resize;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cline x1='10' y1='16' x2='16' y2='10' stroke='%23808080' stroke-width='1'/%3E%3Cline x1='12' y1='16' x2='16' y2='12' stroke='%23808080' stroke-width='1'/%3E%3Cline x1='14' y1='16' x2='16' y2='14' stroke='%23808080' stroke-width='1'/%3E%3C/svg%3E") no-repeat center;
+  }
+
+  /* ── TASKBAR ── */
+  #taskbar {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 28px;
+    background: var(--win-face);
+    border-top: 2px solid var(--win-light);
+    box-shadow: inset 0 1px 0 var(--win-face), 0 -2px 8px rgba(0,0,0,0.3);
+    display: flex; align-items: center; gap: 4px; padding: 2px 4px;
+    z-index: 10000;
+  }
+
+  #start-btn {
+    display: flex; align-items: center; gap: 4px;
+    height: 22px; padding: 0 8px 0 4px;
+    background: var(--win-face);
+    border-top: 2px solid var(--win-light);
+    border-left: 2px solid var(--win-light);
+    border-right: 2px solid var(--win-darker);
+    border-bottom: 2px solid var(--win-darker);
+    cursor: pointer; font-weight: bold; font-size: 11px;
+    white-space: nowrap; flex-shrink: 0;
+    transition: filter 0.1s;
+  }
+  #start-btn:hover { filter: brightness(1.06); }
+  #start-btn:active, #start-btn.active {
+    border-top: 2px solid var(--win-darker);
+    border-left: 2px solid var(--win-darker);
+    border-right: 2px solid var(--win-light);
+    border-bottom: 2px solid var(--win-light);
+  }
+  #start-btn img { width: 16px; height: 16px; image-rendering: pixelated; }
+
+  .taskbar-sep { width: 2px; height: 22px; border-left: 1px solid var(--win-dark); border-right: 1px solid var(--win-light); flex-shrink: 0; }
+
+  .task-btn {
+    display: flex; align-items: center; gap: 4px;
+    height: 22px; padding: 0 6px; max-width: 150px;
+    background: var(--win-face);
+    border-top: 2px solid var(--win-light);
+    border-left: 2px solid var(--win-light);
+    border-right: 2px solid var(--win-darker);
+    border-bottom: 2px solid var(--win-darker);
+    cursor: pointer; font-size: 10px; overflow: hidden;
+    white-space: nowrap; text-overflow: ellipsis;
+    transition: filter 0.1s;
+  }
+  .task-btn:hover { filter: brightness(1.06); }
+  .task-btn.active {
+    border-top: 2px solid var(--win-darker);
+    border-left: 2px solid var(--win-darker);
+    border-right: 2px solid var(--win-light);
+    border-bottom: 2px solid var(--win-light);
+    background: #bbb;
+  }
+  .task-btn img { width: 14px; height: 14px; image-rendering: pixelated; flex-shrink: 0; }
+
+  #taskbar-tray {
+    margin-left: auto; display: flex; align-items: center; gap: 6px;
+    height: 22px; padding: 0 8px;
+    border-top: 1px solid var(--win-dark);
+    border-left: 1px solid var(--win-dark);
+    border-right: 1px solid var(--win-light);
+    border-bottom: 1px solid var(--win-light);
+    flex-shrink: 0;
+  }
+  #clock { font-size: 11px; font-weight: bold; color: #000080; }
+
+  /* ── START MENU ── */
+  #start-menu {
+    position: fixed; bottom: 28px; left: 0;
+    width: 240px;
+    background: var(--win-face);
+    border-top: 2px solid var(--win-light);
+    border-right: 2px solid var(--win-darker);
+    border-bottom: 2px solid var(--win-darker);
+    border-left: 2px solid var(--win-light);
+    display: none; flex-direction: row;
+    z-index: 20000;
+    box-shadow: 4px 4px 12px rgba(0,0,0,0.4);
+    animation: none;
+  }
+  #start-menu.open { display: flex; animation: winOpen 0.15s ease both; }
+  #start-menu-sidebar {
+    width: 28px;
+    background: linear-gradient(180deg, #1084d0, #000080);
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 4px;
+  }
+  #start-menu-sidebar span {
+    color: white; font-weight: bold; font-size: 13px;
+    writing-mode: vertical-rl; transform: rotate(180deg);
+    letter-spacing: 2px;
+  }
+  #start-menu-items { flex: 1; padding: 4px 0; overflow-y: auto; max-height: 70vh; }
+  .start-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 12px 4px 8px; cursor: pointer; font-size: 11px;
+    transition: background 0.1s;
+  }
+  .start-item:hover { background: #000080; color: white; }
+  .start-item img { width: 16px; height: 16px; image-rendering: pixelated; flex-shrink: 0; }
+  .start-sep { height: 1px; background: var(--win-dark); margin: 3px 8px; border-bottom: 1px solid var(--win-light); }
+
+  /* ── SHARED UI COMPONENTS ── */
+  .field-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .field-label { min-width: 90px; color: var(--text); }
+
+  .sunken {
+    background: white;
+    border-top: 1px solid var(--win-darker);
+    border-left: 1px solid var(--win-darker);
+    border-right: 1px solid var(--win-light);
+    border-bottom: 1px solid var(--win-light);
+    padding: 6px 8px;
+  }
+
+  .group-box {
+    border: 1px solid var(--win-dark);
+    padding: 12px 8px 8px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .group-label {
+    position: absolute; top: -7px; left: 8px;
+    background: var(--win-face); padding: 0 4px;
+    font-size: 11px; font-weight: bold;
+  }
+
+  /* Progress bars with shimmer */
+  .progress-bar {
+    height: 16px; background: white;
+    border-top: 1px solid var(--win-darker);
+    border-left: 1px solid var(--win-darker);
+    border-right: 1px solid var(--win-light);
+    border-bottom: 1px solid var(--win-light);
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: repeating-linear-gradient(-45deg,#000080 0,#000080 6px,#0000c0 6px,#0000c0 12px);
+    display: flex; align-items: center;
+    color: white; font-size: 10px; padding-left: 4px;
+    position: relative; overflow: hidden;
+    transition: width 1s cubic-bezier(.25,.8,.25,1);
+  }
+  .progress-fill::after {
+    content: ''; position: absolute; top:0; left:-50%; width:40%; height:100%;
+    background: linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent);
+    animation: barShimmer 2s infinite;
+  }
+  @keyframes barShimmer { 0%{left:-50%} 100%{left:150%} }
+
+  .win98-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .win98-table th {
+    background: var(--win-face);
+    border-top: 1px solid var(--win-light); border-left: 1px solid var(--win-light);
+    border-right: 1px solid var(--win-dark); border-bottom: 2px solid var(--win-dark);
+    padding: 3px 8px; text-align: left; font-weight: bold;
+  }
+  .win98-table td { padding: 3px 8px; border-bottom: 1px solid #c0c0c0; }
+  .win98-table tr:nth-child(even) td { background: #f0f0f0; }
+  .win98-table tr:hover td { background: #000080; color: white; }
+
+  .badge {
+    display: inline-block; padding: 1px 6px;
+    background: #000080; color: white;
+    font-size: 10px; border-radius: 0;
+  }
+  .badge-gold { background: #8a6800; }
+  .badge-purple { background: #6600aa; }
+  .badge-teal { background: #006666; }
+  .star { color: gold; }
+
+  /* ── ABOUT WINDOW ── */
+  .about-header { display: flex; gap: 12px; align-items: flex-start; }
+  .about-avatar {
+    width: 64px; height: 64px; flex-shrink: 0;
+    background: linear-gradient(135deg, #000080, #1084d0);
+    border-top: 2px solid var(--win-darker);
+    border-left: 2px solid var(--win-darker);
+    border-right: 2px solid var(--win-light);
+    border-bottom: 2px solid var(--win-light);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; position: relative; overflow: hidden;
+  }
+  .about-name { font-size: 14px; font-weight: bold; margin-bottom: 2px; }
+  .about-role { font-size: 11px; color: #444; margin-bottom: 4px; }
+
+  /* ── TIMELINE ── */
+  .timeline-item { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start; }
+  .timeline-dot {
+    width: 12px; height: 12px; flex-shrink: 0;
+    background: #000080; margin-top: 2px;
+    border: 2px solid var(--win-light);
+    outline: 1px solid var(--win-dark);
+  }
+  .timeline-line { width: 1px; background: var(--win-dark); margin-left: 5px; margin-right: 5px; align-self: stretch; min-height: 20px; }
+  .tl-date { font-size: 10px; color: #666; margin-bottom: 2px; }
+  .tl-title { font-weight: bold; margin-bottom: 1px; }
+  .tl-desc { color: #444; font-size: 10px; }
+
+  /* ── CONTACT ── */
+  .form-input {
+    width: 100%; height: 20px; font-size: 11px; font-family: var(--font);
+    background: white;
+    border-top: 1px solid var(--win-darker);
+    border-left: 1px solid var(--win-darker);
+    border-right: 1px solid var(--win-light);
+    border-bottom: 1px solid var(--win-light);
+    padding: 0 4px;
+  }
+  .form-textarea {
+    width: 100%; height: 60px; font-size: 11px; font-family: var(--font); resize: vertical;
+    background: white;
+    border-top: 1px solid var(--win-darker);
+    border-left: 1px solid var(--win-darker);
+    border-right: 1px solid var(--win-light);
+    border-bottom: 1px solid var(--win-light);
+    padding: 4px;
+  }
+  .submit-btn {
+    padding: 3px 16px; font-size: 11px; font-family: var(--font);
+    background: var(--win-face);
+    border-top: 2px solid var(--win-light);
+    border-left: 2px solid var(--win-light);
+    border-right: 2px solid var(--win-darker);
+    border-bottom: 2px solid var(--win-darker);
+    cursor: pointer; transition: filter 0.1s;
+  }
+  .submit-btn:hover { filter: brightness(1.06); }
+  .submit-btn:active {
+    border-top: 2px solid var(--win-darker);
+    border-left: 2px solid var(--win-darker);
+    border-right: 2px solid var(--win-light);
+    border-bottom: 2px solid var(--win-light);
+  }
+
+  /* ── SKILLS ── */
+  .skill-row { margin-bottom: 8px; }
+  .skill-name { margin-bottom: 2px; }
+
+  /* ── PROJECT CARDS ── */
+  .project-card {
+    background: white;
+    border-top: 1px solid var(--win-darker);
+    border-left: 1px solid var(--win-darker);
+    border-right: 1px solid var(--win-light);
+    border-bottom: 1px solid var(--win-light);
+    padding: 8px; margin-bottom: 8px;
+    transition: box-shadow 0.2s, transform 0.15s;
+  }
+  .project-card:hover {
+    box-shadow: 3px 4px 12px rgba(0,0,0,0.25);
+    transform: translateY(-1px);
+  }
+  .project-title { font-weight: bold; margin-bottom: 3px; }
+  .project-desc { color: #333; margin-bottom: 4px; line-height: 1.5; }
+
+  /* ── HONORS ── */
+  .honor-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; margin-bottom: 4px;
+    background: white;
+    border-top: 1px solid var(--win-darker);
+    border-left: 1px solid var(--win-darker);
+    border-right: 1px solid var(--win-light);
+    border-bottom: 1px solid var(--win-light);
+    transition: box-shadow 0.15s;
+  }
+  .honor-item:hover { box-shadow: 2px 3px 8px rgba(0,0,0,0.2); }
+  .honor-icon { font-size: 18px; }
+  .honor-title { font-weight: bold; }
+  .honor-sub { font-size: 10px; color: #555; }
+
+  /* ── 3D VIEWER ── */
+  .viewer-frame {
+    background: black; width: 100%; aspect-ratio: 4/3;
+    display: flex; align-items: center; justify-content: center;
+    border-top: 1px solid var(--win-darker);
+    border-left: 1px solid var(--win-darker);
+    border-right: 1px solid var(--win-light);
+    border-bottom: 1px solid var(--win-light);
+    position: relative; overflow: hidden;
+  }
+  .viewer-frame img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+  /* ── MEDIA STUDIO WINDOW ── */
+  .media-tabs {
+    display: flex; background: #c0c0c0;
+    border-bottom: 2px solid #808080;
+    padding: 2px 4px 0; gap: 2px;
+  }
+  .media-tab {
+    padding: 3px 14px; font-size: 11px; cursor: pointer;
+    background: var(--win-face);
+    border-top: 1px solid var(--win-dark);
+    border-left: 1px solid var(--win-dark);
+    border-right: 1px solid var(--win-dark);
+    transition: background 0.1s;
+  }
+  .media-tab.active {
+    background: white; font-weight: bold;
+    border-top: 2px solid #000080;
+    position: relative; top: 1px;
+  }
+  .media-tab:hover:not(.active) { background: #e0e8f4; }
+
+  /* Video player chrome */
+  .video-chrome {
+    background: #111;
+    border-top: 1px solid var(--win-darker);
+    border-left: 1px solid var(--win-darker);
+    border-right: 1px solid var(--win-light);
+    border-bottom: 1px solid var(--win-light);
+    overflow: hidden;
+  }
+  .video-chrome video { width: 100%; display: block; background: #000; }
+  .video-placeholder {
+    width: 100%; aspect-ratio: 16/9;
+    background: linear-gradient(135deg, #0a0a1a 0%, #0d0d2e 40%, #0a0a1a 100%);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: #4488ff; font-family: 'VT323', monospace;
+    font-size: 18px; text-align: center; gap: 10px;
+    position: relative; overflow: hidden;
+    cursor: pointer;
+  }
+  .video-placeholder::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(68,136,255,0.05) 3px,rgba(68,136,255,0.05) 4px);
+    pointer-events: none;
+  }
+  .play-btn-big {
+    width: 54px; height: 54px; border-radius: 50%;
+    background: rgba(68,136,255,0.2);
+    border: 2px solid #4488ff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: #4488ff;
+    box-shadow: 0 0 20px rgba(68,136,255,0.5);
+    transition: transform 0.15s, box-shadow 0.15s;
+    cursor: pointer;
+  }
+  .play-btn-big:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 34px rgba(68,136,255,0.8);
+  }
+
+  /* Poster grid */
+  .poster-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px; padding: 6px;
+  }
+  .poster-card {
+    aspect-ratio: 3/4;
+    background: #111;
+    border-top: 1px solid var(--win-darker);
+    border-left: 1px solid var(--win-darker);
+    border-right: 1px solid var(--win-light);
+    border-bottom: 1px solid var(--win-light);
+    overflow: hidden; cursor: pointer;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .poster-card:hover { transform: scale(1.03); box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+  .poster-card img { width: 100%; height: 100%; object-fit: cover; }
+  .poster-card .poster-label {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,80,0.85);
+    color: white; font-size: 9px; padding: 3px 5px;
+    text-align: center;
+  }
+  .poster-placeholder {
+    width: 100%; height: 100%;
+    background: linear-gradient(135deg, #0a0028, #200050);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: #8866ff; font-size: 28px; gap: 4px;
+  }
+  .poster-placeholder span { font-size: 9px; color: #6644aa; text-align: center; }
+
+  /* Lightbox */
+  #lightbox {
+    position: fixed; inset: 0; z-index: 90000;
+    background: rgba(0,0,0,0.9);
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 10px;
+  }
+  #lightbox.open { display: flex; }
+  #lightbox img { max-width: 85vw; max-height: 80vh; object-fit: contain; border: 2px solid #444; }
+  #lightbox-close {
+    position: absolute; top: 16px; right: 20px;
+    color: white; font-size: 28px; cursor: pointer;
+    background: none; border: none;
+    font-family: var(--font); line-height: 1;
+  }
+  #lightbox-caption { color: #ccc; font-size: 12px; }
+
+  /* ── EXCEL TABS ── */
+  .xl-tab {
+    padding: 2px 10px; font-size: 10px; cursor: pointer;
+    background: var(--win-face);
+    border-top: 1px solid var(--win-dark);
+    border-left: 1px solid var(--win-dark);
+    border-right: 1px solid var(--win-dark);
+    margin-right: 2px; white-space: nowrap;
+    transition: background 0.1s;
+  }
+  .xl-tab.active {
+    background: white; font-weight: bold;
+    border-top: 2px solid #2e75b6;
+    position: relative; top: 1px; color: #1f3864;
+  }
+  .xl-tab:hover:not(.active) { background: #e0e8f4; }
+
+  /* ── NOTEPAD ── */
+  .notepad-body { background: white; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.6; white-space: pre-wrap; }
+
+  /* ── BSOD ── */
+  #bsod {
+    display: none; position: fixed; inset: 0;
+    background: #000080; color: white;
+    font-family: 'VT323', monospace; font-size: 20px;
+    z-index: 99999; padding: 40px 80px; line-height: 1.8;
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  .blink { animation: blink 1s infinite; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  .pulse { animation: pulse 2s infinite; }
+
+  /* ── TOOLTIP ── */
+  #tooltip {
+    position: fixed; pointer-events: none;
+    background: #ffffe1; border: 1px solid #000;
+    padding: 2px 5px; font-size: 11px;
+    display: none; z-index: 99998;
+    font-family: var(--font); box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+  }
+
+  /* "NEW" badge on taskbar */
+  .task-btn .new-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: red; flex-shrink: 0;
+    animation: blink 0.8s infinite;
+  }
+
+  /* Glowing tray */
+  #taskbar-tray { animation: trayPulse 4s ease-in-out infinite; }
+  @keyframes trayPulse { 0%,100%{box-shadow:inset 0 0 0 transparent} 50%{box-shadow:inset 0 0 4px rgba(0,0,128,0.15)} }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ BOOT SCREEN ═══════════ -->
+<div id="boot-screen">
+  <div class="boot-scanline"></div>
+  <div class="boot-logo">MCHS OS</div>
+  <div class="boot-sub">Engineering Portfolio System v9</div>
+  <div class="boot-log" id="boot-log"></div>
+  <div class="boot-bar-wrap" style="margin-top:14px">
+    <div class="boot-bar-fill" id="boot-bar"></div>
+  </div>
+  <div class="boot-pct" id="boot-pct">0%</div>
+</div>
+
+<!-- ═══════════ DESKTOP ═══════════ -->
+<div id="desktop">
+  <canvas id="particle-canvas"></canvas>
+
+  <!-- Desktop Icons LEFT -->
+  <div class="desktop-icon" style="top:20px;left:20px" ondblclick="openWin('about')" onclick="selectIcon(this)" title="Personal profile">
+    <img src="https://win98icons.alexmeub.com/icons/png/user_world-0.png" alt=""><span>About_Me.exe</span>
+  </div>
+  <div class="desktop-icon" style="top:110px;left:20px" ondblclick="openWin('skills')" onclick="selectIcon(this)" title="Technical capabilities">
+    <img src="https://win98icons.alexmeub.com/icons/png/settings_app-0.png" alt=""><span>Skills.sys</span>
+  </div>
+  <div class="desktop-icon" style="top:200px;left:20px" ondblclick="openWin('projects')" onclick="selectIcon(this)" title="Engineering portfolio">
+    <img src="https://win98icons.alexmeub.com/icons/png/ms_excel-0.png" alt=""><span>Projects.xls</span>
+  </div>
+  <div class="desktop-icon" style="top:290px;left:20px" ondblclick="openWin('honors')" onclick="selectIcon(this)" title="Academic recognition">
+    <img src="https://win98icons.alexmeub.com/icons/png/certificate_2-0.png" alt=""><span>Honors.sys</span>
+  </div>
+  <div class="desktop-icon" style="top:380px;left:20px" ondblclick="openWin('timeline')" onclick="selectIcon(this)" title="Education timeline">
+    <img src="https://win98icons.alexmeub.com/icons/png/calendar-0.png" alt=""><span>Timeline.log</span>
+  </div>
+  <div class="desktop-icon" style="top:470px;left:20px" ondblclick="openWin('contact')" onclick="selectIcon(this)" title="Send a message">
+    <img src="https://win98icons.alexmeub.com/icons/png/mailnews-0.png" alt=""><span>Contact.msg</span>
+  </div>
+
+  <!-- Desktop Icons RIGHT -->
+  <div class="desktop-icon" style="top:20px;right:20px" ondblclick="openWin('media')" onclick="selectIcon(this)" title="Video editing & poster showcase">
+    <img src="https://win98icons.alexmeub.com/icons/png/paint_old-0.png" alt=""><span>Media_Studio.exe</span>
+  </div>
+  <div class="desktop-icon" style="top:110px;right:20px" ondblclick="openWin('viewer3d')" onclick="selectIcon(this)" title="3D project renders">
+    <img src="https://win98icons.alexmeub.com/icons/png/paint_old-0.png" alt=""><span>3D_Projects.jpg</span>
+  </div>
+  <div class="desktop-icon" style="top:200px;right:20px" ondblclick="openWin('excel')" onclick="selectIcon(this)" title="RCD Design Tool">
+    <img src="https://win98icons.alexmeub.com/icons/png/ms_excel-0.png" alt=""><span>RCD_Tool.xlsm</span>
+  </div>
+  <div class="desktop-icon" style="top:290px;right:20px" ondblclick="openWin('notepad')" onclick="selectIcon(this)" title="Read me first">
+    <img src="https://win98icons.alexmeub.com/icons/png/notepad-0.png" alt=""><span>README.txt</span>
+  </div>
+  <div class="desktop-icon" style="top:380px;right:20px" ondblclick="triggerBsod()" onclick="selectIcon(this)" title="Don't click this">
+    <img src="https://win98icons.alexmeub.com/icons/png/recycle_bin_empty-0.png" alt=""><span>Recycle Bin</span>
+  </div>
+</div>
+
+<!-- ═══════════ WINDOWS ═══════════ -->
+
+<!-- ABOUT -->
+<div class="win" id="win-about" style="width:490px;height:350px;top:60px;left:100px">
+  <div class="win-titlebar" onmousedown="startDrag(event,'win-about')">
+    <img class="win-icon" src="https://win98icons.alexmeub.com/icons/png/user_world-0.png" alt="">
+    <span class="win-title">About_Me.exe — Mark Christian Silos</span>
+    <div class="win-btns">
+      <div class="win-btn" onclick="minimizeWin('win-about')">_</div>
+      <div class="win-btn" onclick="maximizeWin('win-about')">□</div>
+      <div class="win-btn" onclick="closeWin('win-about')" style="font-weight:bold;margin-left:2px">✕</div>
+    </div>
+  </div>
+  <div class="win-menubar">
+    <span class="win-menu-item">File</span><span class="win-menu-item">View</span><span class="win-menu-item">Help</span>
+  </div>
+  <div class="win-body">
+    <div class="about-header">
+      <div class="about-avatar">👷</div>
+      <div>
+        <div class="about-name">Mark Christian H. Silos</div>
+        <div class="about-role">Civil Engineering Student @ PCU Dasmariñas</div>
+        <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">
+          <span class="badge">🏅 Dean's Lister</span>
+          <span class="badge">🎓 Class of 2026</span>
+          <span class="badge badge-purple">🎬 Video Editor</span>
+          <span class="badge badge-teal">🎨 Graphic Designer</span>
+        </div>
+      </div>
+    </div>
+    <div class="group-box" style="margin-top:10px">
+      <div class="group-label">System Properties</div>
+      <div class="field-row"><span class="field-label">Full Name:</span><span>Mark Christian Silos</span></div>
+      <div class="field-row"><span class="field-label">Program:</span><span>BS Civil Engineering</span></div>
+      <div class="field-row"><span class="field-label">School:</span><span>Philippine Christian University — Dasmariñas</span></div>
+      <div class="field-row"><span class="field-label">Email:</span><span style="color:#000080">markchristiansilos123@gmail.com</span></div>
+      <div class="field-row"><span class="field-label">Specialties:</span><span>Structural Engineering · Video Editing · Graphic Design</span></div>
+      <div class="field-row"><span class="field-label">Status:</span><span style="color:green">● Open to opportunities</span></div>
+    </div>
+    <div class="group-box">
+      <div class="group-label">Bio.txt</div>
+      <div class="sunken" style="line-height:1.7">
+        Aspiring civil engineer with a strong academic foundation and a passion for structural analysis, reinforced concrete design, and project management. Beyond engineering, I bring a creative dimension through video editing and poster design — combining technical precision with visual storytelling to produce impactful content.
+      </div>
+    </div>
+  </div>
+  <div class="win-statusbar">
+    <div class="status-panel">Ready</div>
+    <div class="status-panel" style="max-width:200px">Mark_Silos.info loaded</div>
+  </div>
+  <div class="win-resize" onmousedown="startResize(event,'win-about')"></div>
+</div>
+
+<!-- SKILLS -->
+<div class="win" id="win-skills" style="width:440px;height:500px;top:80px;left:160px">
+  <div class="win-titlebar" onmousedown="startDrag(event,'win-skills')">
+    <img class="win-icon" src="https://win98icons.alexmeub.com/icons/png/settings_app-0.png" alt="">
+    <span class="win-title">Skills.sys — Full Capability Overview</span>
+    <div class="win-btns">
+      <div class="win-btn" onclick="minimizeWin('win-skills')">_</div>
+      <div class="win-btn" onclick="maximizeWin('win-skills')">□</div>
+      <div class="win-btn" onclick="closeWin('win-skills')" style="font-weight:bold;margin-left:2px">✕</div>
+    </div>
+  </div>
+  <div class="win-menubar"><span class="win-menu-item">File</span><span class="win-menu-item">View</span></div>
+  <div class="win-body">
+
+    <div class="group-box">
+      <div class="group-label">Engineering Software</div>
+      <div class="skill-row"><div class="skill-name">AutoCAD</div><div class="progress-bar"><div class="progress-fill" style="width:88%">88%</div></div></div>
+      <div class="skill-row"><div class="skill-name">Microsoft Excel (Advanced VBA)</div><div class="progress-bar"><div class="progress-fill" style="width:92%">92%</div></div></div>
+      <div class="skill-row"><div class="skill-name">SketchUp / 3D Modeling</div><div class="progress-bar"><div class="progress-fill" style="width:80%">80%</div></div></div>
+      <div class="skill-row"><div class="skill-name">STAAD Pro / Structural Analysis</div><div class="progress-bar"><div class="progress-fill" style="width:70%">70%</div></div></div>
+    </div>
+
+    <div class="group-box">
+      <div class="group-label">Technical Engineering</div>
+      <div class="skill-row"><div class="skill-name">Reinforced Concrete Design (NSCP)</div><div class="progress-bar"><div class="progress-fill" style="width:85%">85%</div></div></div>
+      <div class="skill-row"><div class="skill-name">Structural Load Analysis</div><div class="progress-bar"><div class="progress-fill" style="width:82%">82%</div></div></div>
+      <div class="skill-row"><div class="skill-name">Project Scheduling (CPM/Gantt)</div><div class="progress-bar"><div class="progress-fill" style="width:75%">75%</div></div></div>
+      <div class="skill-row"><div class="skill-name">Cost Estimation</div><div class="progress-bar"><div class="progress-fill" style="width:70%">70%</div></div></div>
+    </div>
+
+    <div class="group-box" style="border-color:#6600aa">
+      <div class="group-label" style="background:var(--win-face);color:#6600aa">🎬 Video Editing & Creative</div>
+      <div class="skill-row">
+        <div class="skill-name" style="display:flex;align-items:center;gap:6px">
+          <span style="color:#6600aa">▶</span> CapCut / Mobile Video Editing
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:90%;background:repeating-linear-gradient(-45deg,#6600aa,#6600aa 6px,#8800dd 6px,#8800dd 12px)">90%</div></div>
+      </div>
+      <div class="skill-row">
+        <div class="skill-name" style="display:flex;align-items:center;gap:6px">
+          <span style="color:#6600aa">▶</span> Video Sequencing & Transitions
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:85%;background:repeating-linear-gradient(-45deg,#6600aa,#6600aa 6px,#8800dd 6px,#8800dd 12px)">85%</div></div>
+      </div>
+      <div class="skill-row">
+        <div class="skill-name" style="display:flex;align-items:center;gap:6px">
+          <span style="color:#6600aa">▶</span> Motion Text & Keyframe Animation
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:80%;background:repeating-linear-gradient(-45deg,#6600aa,#6600aa 6px,#8800dd 6px,#8800dd 12px)">80%</div></div>
+      </div>
+      <div class="skill-row">
+        <div class="skill-name" style="display:flex;align-items:center;gap:6px">
+          <span style="color:#6600aa">▶</span> Color Grading & LUT Application
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:78%;background:repeating-linear-gradient(-45deg,#6600aa,#6600aa 6px,#8800dd 6px,#8800dd 12px)">78%</div></div>
+      </div>
+      <div class="skill-row">
+        <div class="skill-name" style="display:flex;align-items:center;gap:6px">
+          <span style="color:#006666">🎨</span> Canva / Poster Design
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:88%;background:repeating-linear-gradient(-45deg,#006666,#006666 6px,#008888 6px,#008888 12px)">88%</div></div>
+      </div>
+      <div class="skill-row">
+        <div class="skill-name" style="display:flex;align-items:center;gap:6px">
+          <span style="color:#006666">🎨</span> Typography & Layout Design
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:82%;background:repeating-linear-gradient(-45deg,#006666,#006666 6px,#008888 6px,#008888 12px)">82%</div></div>
+      </div>
+    </div>
+
+    <div class="group-box">
+      <div class="group-label">Soft Skills</div>
+      <table class="win98-table">
+        <tr><th>Skill</th><th>Level</th></tr>
+        <tr><td>Technical Report Writing</td><td><span class="badge">Advanced</span></td></tr>
+        <tr><td>Team Leadership</td><td><span class="badge">Proficient</span></td></tr>
+        <tr><td>Creative Problem Solving</td><td><span class="badge">Advanced</span></td></tr>
+        <tr><td>Visual Communication</td><td><span class="badge badge-teal">Advanced</span></td></tr>
+        <tr><td>Time Management</td><td><span class="badge">Advanced</span></td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="win-statusbar"><div class="status-panel">15 skills loaded</div></div>
+  <div class="win-resize" onmousedown="startResize(event,'win-skills')"></div>
+</div>
+
+<!-- PROJECTS -->
+<div class="win" id="win-projects" style="width:520px;height:420px;top:70px;left:200px">
+  <div class="win-titlebar" onmousedown="startDrag(event,'win-projects')">
+    <img class="win-icon" src="https://win98icons.alexmeub.com/icons/png/ms_excel-0.png" alt="">
+    <span class="win-title">Projects.xls — Engineering Portfolio</span>
+    <div class="win-btns">
+      <div class="win-btn" onclick="minimizeWin('win-projects')">_</div>
+      <div class="win-btn" onclick="maximizeWin('win-projects')">□</div>
+      <div class="win-btn" onclick="closeWin('win-projects')" style="font-weight:bold;margin-left:2px">✕</div>
+    </div>
+  </div>
+  <div class="win-menubar"><span class="win-menu-item">File</span><span class="win-menu-item">Edit</span><span class="win-menu-item">View</span><span class="win-menu-item">Insert</span></div>
+  <div class="win-toolbar">
+    <button class="toolbar-btn" onclick="alert('Feature coming soon!')">📂 Open</button>
+    <div class="toolbar-sep"></div>
+    <button class="toolbar-btn" onclick="alert('All rights reserved © 2026')">🖨️ Print</button>
+    <div class="toolbar-sep"></div>
+    <button class="toolbar-btn" onclick="openWin('media')">🎬 Media Studio</button>
+  </div>
+  <div class="win-body">
+    <div class="project-card" ondblclick="openWin('excel')" style="cursor:pointer">
+      <div class="project-title">📊 RCD Tool — Reinforced Concrete Design Suite <span style="font-size:9px;color:#0000aa">[dbl-click]</span></div>
+      <div class="project-desc">Full-featured Excel/VBA automated design platform for BSCVE3C. Covers complete NSCP 2015 structural workflow: load analysis, slab tributary distribution, beam deflection, flexural analysis (singly & doubly reinforced, T-beams), axial column design, shear, torsion, and consolidated results. Includes PASS/FAIL indicators, β₁ auto-computation, φ strength reduction, and Philippine standard bar tables.</div>
+      <div><span class="badge">Excel VBA</span>&nbsp;<span class="badge">NSCP 2015</span>&nbsp;<span class="badge">14 Sheets</span>&nbsp;<span class="badge">Auto-Design</span></div>
+    </div>
+    <div class="project-card">
+      <div class="project-title">🏗️ 3D Structural & Architectural Models (SketchUp)</div>
+      <div class="project-desc">Detailed 3D models of residential and multi-story structures in SketchUp with accurate dimensional framing, floor-to-floor heights, column/beam grid layouts, and architectural finishing.</div>
+      <div><span class="badge">SketchUp</span>&nbsp;<span class="badge">3D Modeling</span>&nbsp;<span class="badge">BSD Residential</span></div>
+    </div>
+    <div class="project-card">
+      <div class="project-title">📅 Construction Calendar Monitor</div>
+      <div class="project-desc">Dynamic Excel project timeline tracker with conditional formatting auto-highlighting milestone deadlines, delays, and percent-completion with Gantt-style visualization.</div>
+      <div><span class="badge">Excel</span>&nbsp;<span class="badge">Conditional Formatting</span>&nbsp;<span class="badge">Project Mgmt</span></div>
+    </div>
+    <div class="project-card" ondblclick="openWin('media')" style="cursor:pointer">
+      <div class="project-title">🎬 Video Editing Portfolio <span style="font-size:9px;color:#6600aa">[dbl-click to open Media Studio]</span></div>
+      <div class="project-desc">Collection of edited video content including event documentation, promotional clips, and creative reels. Skilled in pacing, transitions, color grading, and motion text to produce polished, audience-ready content.</div>
+      <div><span class="badge badge-purple">Video Editing</span>&nbsp;<span class="badge badge-teal">Color Grading</span>&nbsp;<span class="badge badge-purple">Motion Text</span></div>
+    </div>
+  </div>
+  <div class="win-statusbar">
+    <div class="status-panel">4 projects found</div>
+    <div class="status-panel" style="max-width:180px">Double-click to preview</div>
+  </div>
+  <div class="win-resize" onmousedown="startResize(event,'win-projects')"></div>
+</div>
+
+<!-- HONORS -->
+<div class="win" id="win-honors" style="width:380px;height:320px;top:90px;left:250px">
+  <div class="win-titlebar" onmousedown="startDrag(event,'win-honors')">
+    <img class="win-icon" src="https://win98icons.alexmeub.com/icons/png/certificate_2-0.png" alt="">
+    <span class="win-title">Honors.sys — Academic Recognition</span>
+    <div class="win-btns">
+      <div class="win-btn" onclick="minimizeWin('win-honors')">_</div>
+      <div class="win-btn" onclick="maximizeWin('win-honors')">□</div>
+      <div class="win-btn" onclick="closeWin('win-honors')" style="font-weight:bold;margin-left:2px">✕</div>
+    </div>
+  </div>
+  <div class="win-menubar"><span class="win-menu-item">File</span><span class="win-menu-item">View</span></div>
+  <div class="win-body">
+    <div class="group-box">
+      <div class="group-label">College</div>
+      <div class="honor-item">
+        <div class="honor-icon">🎖️</div>
+        <div>
+          <div class="honor-title">Dean's Lister</div>
+          <div class="honor-sub">PCU Dasmariñas — 2023, 2024, 2025, 2026</div>
+          <div style="margin-top:3px"><span class="star">★★★★★</span></div>
+        </div>
+      </div>
+      <div class="honor-item">
+        <div class="honor-icon">🏆</div>
+        <div>
+          <div class="honor-title">Academic Excellence</div>
+          <div class="honor-sub">Consistent top performer in CE program</div>
+          <div style="margin-top:3px"><span class="star">★★★★☆</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="group-box">
+      <div class="group-label">Pre-College</div>
+      <div class="honor-item">
+        <div class="honor-icon">🥇</div>
+        <div><div class="honor-title">High Honors — Senior High School</div><div class="honor-sub">Graduated with distinction</div></div>
+      </div>
+      <div class="honor-item">
+        <div class="honor-icon">🥈</div>
+        <div><div class="honor-title">Honors — Junior High School</div><div class="honor-sub">Academic merit recognition</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="win-statusbar"><div class="status-panel">4 records found</div></div>
+  <div class="win-resize" onmousedown="startResize(event,'win-honors')"></div>
+</div>
+
+<!-- TIMELINE -->
+<div class="win" id="win-timeline" style="width:400px;height:440px;top:80px;left:300px">
+  <div class="win-titlebar" onmousedown="startDrag(event,'win-timeline')">
+    <img class="win-icon" src="https://win98icons.alexmeub.com/icons/png/calendar-0.png" alt="">
+    <span class="win-title">Timeline.log — Education &amp; Experience</span>
+    <div class="win-btns">
+      <div class="win-btn" onclick="minimizeWin('win-timeline')">_</div>
+      <div class="win-btn" onclick="maximizeWin('win-timeline')">□</div>
+      <div class="win-btn" onclick="closeWin('win-timeline')" style="font-weight:bold;margin-left:2px">✕</div>
+    </div>
+  </div>
+  <div class="win-menubar"><span class="win-menu-item">File</span><span class="win-menu-item">View</span></div>
+  <div class="win-body">
+    <div class="group-box">
+      <div class="group-label">Chronological Log</div>
+      <div style="padding-left:4px">
+        <div class="timeline-item">
+          <div style="display:flex;flex-direction:column;align-items:center"><div class="timeline-dot"></div><div class="timeline-line"></div></div>
+          <div><div class="tl-date">2022 – Present</div><div class="tl-title">BS Civil Engineering</div><div class="tl-desc">Philippine Christian University — Dasmariñas. Dean's Lister 2023–2026. Focus: Structural Engineering & Construction Management.</div></div>
+        </div>
+        <div class="timeline-item">
+          <div style="display:flex;flex-direction:column;align-items:center"><div class="timeline-dot" style="background:#808080"></div><div class="timeline-line"></div></div>
+          <div><div class="tl-date">2020 – 2022</div><div class="tl-title">Senior High School</div><div class="tl-desc">Graduated with High Honors. STEM strand with focus on mathematics and physical sciences.</div></div>
+        </div>
+        <div class="timeline-item">
+          <div style="display:flex;flex-direction:column;align-items:center"><div class="timeline-dot" style="background:#808080"></div><div class="timeline-line"></div></div>
+          <div><div class="tl-date">2016 – 2020</div><div class="tl-title">Junior High School</div><div class="tl-desc">Graduated with Honors. Developed early interest in mathematics and structural problem-solving.</div></div>
+        </div>
+        <div class="timeline-item">
+          <div style="display:flex;flex-direction:column;align-items:center"><div class="timeline-dot" style="background:#1084d0"></div><div class="timeline-line"></div></div>
+          <div><div class="tl-date">2023 – Present</div><div class="tl-title">Excel Engineering Tools</div><div class="tl-desc">Developed multiple engineering spreadsheet tools for structural design and project monitoring, used by classmates and study groups.</div></div>
+        </div>
+        <div class="timeline-item">
+          <div style="display:flex;flex-direction:column;align-items:center"><div class="timeline-dot" style="background:#6600aa"></div></div>
+          <div><div class="tl-date">2022 – Present</div><div class="tl-title">🎬 Video Editing & Graphic Design</div><div class="tl-desc">Self-taught video editor and poster designer. Produces promotional videos, event reels, and print-ready poster layouts using CapCut and Canva.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="win-statusbar"><div class="status-panel">5 entries</div></div>
+  <div class="win-resize" onmousedown="startResize(event,'win-timeline')"></div>
+</div>
+
+<!-- CONTACT -->
+<div class="win" id="win-contact" style="width:380px;height:360px;top:100px;left:350px">
+  <div class="win-titlebar" onmousedown="startDrag(event,'win-contact')">
+    <img class="win-icon" src="https://win98icons.alexmeub.com/icons/png/mailnews-0.png" alt="">
+    <span class="win-title">Contact.msg — Send a Message</span>
+    <div class="win-btns">
+      <div class="win-btn" onclick="minimizeWin('win-contact')">_</div>
+      <div class="win-btn" onclick="maximizeWin('win-contact')">□</div>
+      <div class="win-btn" onclick="closeWin('win-contact')" style="font-weight:bold;margin-left:2px">✕</div>
+    </div>
+  </div>
+  <div class="win-menubar"><span class="win-menu-item">File</span><span class="win-menu-item">Send</span></div>
+  <div class="win-toolbar">
+    <button class="toolbar-btn" onclick="sendContact()">📤 Send</button>
+    <div class="toolbar-sep"></div>
+    <button class="toolbar-btn" onclick="clearContact()">🗑️ Clear</button>
+  </div>
+  <div class="win-body">
+    <div class="group-box">
+      <div class="group-label">New Message</div>
+      <div class="field-row"><span class="field-label">To:</span><input class="form-input" value="markchristiansilos123@gmail.com" readonly style="flex:1;color:#000080"></div>
+      <div class="field-row"><span class="field-label">From:</span><input class="form-input" id="contact-from" placeholder="Your name" style="flex:1"></div>
+      <div class="field-row"><span class="field-label">Subject:</span><input class="form-input" id="contact-subject" placeholder="Job opportunity / Inquiry" style="flex:1"></div>
+      <div style="margin-top:6px"><div style="margin-bottom:3px">Message:</div><textarea class="form-textarea" id="contact-msg" placeholder="Type your message here..."></textarea></div>
+      <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="submit-btn" onclick="sendContact()">Send</button>
+        <button class="submit-btn" onclick="clearContact()">Cancel</button>
+      </div>
+    </div>
+    <div class="group-box" style="margin-top:6px">
+      <div class="group-label">Direct Links</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <a href="mailto:markchristiansilos123@gmail.com" style="color:#000080;font-size:11px">📧 markchristiansilos123@gmail.com</a>
+        <span style="font-size:11px;color:#444">📍 Dasmariñas, Cavite, Philippines</span>
+      </div>
+    </div>
+  </div>
+  <div class="win-statusbar"><div class="status-panel" id="contact-status">Ready to compose</div></div>
+  <div class="win-resize" onmousedown="startResize(event,'win-contact')"></div>
+</div>
+
+<!-- 3D VIEWER -->
+<div class="win" id="win-viewer3d" style="width:460px;height:380px;top:70px;left:130px">
+  <div class="win-titlebar" onmousedown="startDrag(event,'win-viewer3d')">
+    <img class="win-icon" src="https://win98icons.alexmeub.com/icons/png/paint_old-0.png" alt="">
+    <span class="win-title">3D_Projects.jpg — Image Viewer</span>
+    <div class="win-btns">
+      <div class="win-btn" onclick="minimizeWin('win-viewer3d')">_</div>
+      <div class="win-btn" onclick="maximizeWin('win-viewer3d')">□</div>
+      <div class="win-btn" onclick="closeWin('win-viewer3d')" style="font-weight:bold;margin-left:2px">✕</div>
+    </div>
+  </div>
+  <div class="win-menubar"><span class="win-menu-item">File</span><span class="win-menu-item">View</span></div>
+  <div class="win-toolbar">
+    <button class="toolbar-btn" onclick="prevImg()">◀ Prev</button>
+    <button class="toolbar-btn" onclick="nextImg()">Next ▶</button>
+    <div class="toolbar-sep"></div>
+    <span id="img-counter" style="font-size:11px;padding:0 6px">1 / 4</span>
+  </div>
+  <div class="win-body" style="padding:4px;display:flex;flex-direction:column;gap:4px">
+    <div class="viewer-frame">
+      <img id="viewer-img" src="https://i.postimg.cc/D0rQ9YxH/image.png" alt="3D Project" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'150\'%3E%3Crect fill=\'%23222\' width=\'200\' height=\'150\'/%3E%3Ctext fill=\'%23888\' x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-size=\'14\'%3EImage not found%3C/text%3E%3C/svg%3E'">
+    </div>
+    <div id="img-caption" class="sunken" style="font-size:11px;min-height:32px">BSD Residential Project — View 1 | SketchUp 3D Model</div>
+  </div>
+  <div class="win-statusbar"><div class="status-panel">Image 1 of 4</div></div>
+  <div class="win-resize" onmousedown="startResize(event,'win-viewer3d')"></div>
+</div>
+
+<!-- NOTEPAD -->
+<div class="win" id="win-notepad" style="width:400px;height:300px;top:120px;left:180px">
+  <div class="win-titlebar" onmousedown="startDrag(event,'win-notepad')">
+    <img class="win-icon" src="https://win98icons.alexmeub.com/icons/png/notepad-0.png" alt="">
+    <span class="win-title">Notepad — README.txt</span>
+    <div class="win-btns">
+      <div class="win-btn" onclick="minimizeWin('win-notepad')">_</div>
+      <div class="win-btn" onclick="maximizeWin('win-notepad')">□</div>
+      <div class="win-btn" onclick="closeWin('win-notepad')" style="font-weight:bold;margin-left:2px">✕</div>
+    </div>
+  </div>
+  <div class="win-menubar"><span class="win-menu-item">File</span><span class="win-menu-item">Edit</span><span class="win-menu-item">Format</span></div>
+  <div class="win-body notepad-body" style="background:white;font-family:'Courier New',monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;padding:8px">Welcome to MCHS Portfolio OS v9
+================================
+
+This interactive resume is the portfolio
+of Mark Christian Silos, a Civil Engineering
+student at PCU Dasmariñas.
+
+NAVIGATION:
+- Double-click desktop icons to open apps
+- Drag windows by their title bar
+- Minimize, maximize, or close any window
+- Use the Start menu for quick access
+- Check the taskbar to switch windows
+
+CONTENTS:
+  About_Me.exe     → Personal profile
+  Skills.sys       → Technical capabilities
+  Projects.xls     → Engineering portfolio
+  Honors.sys       → Academic achievements
+  Timeline.log     → Education history
+  Contact.msg      → Get in touch
+  Media_Studio.exe → 🎬 Video & Poster showcase
+  3D_Projects      → Visual work samples
+  RCD_Tool.xlsm   → Structural design tool
+
+HOW TO ADD YOUR VIDEO:
+  Open Media_Studio.exe → Video tab
+  Click the placeholder and follow
+  the on-screen instructions.
+
+Built with pure HTML/CSS/JS.
+No frameworks. No libraries.
+Just engineering precision. 😄
+
+© 2026 Mark Christian H. Silos
+All rights reserved.</div>
+  <div class="win-resize" onmousedown="startResize(event,'win-notepad')"></div>
+</div>
+
+<!-- ═══════════ MEDIA STUDIO WINDOW ═══════════ -->
+<div class="win" id="win-media" style="width:560px;height:500px;top:50px;left:90px">
+  <div class="win-titlebar" onmousedown="startDrag(event,'win-media')">
+    <img class="win-icon" src="https://win98icons.alexmeub.com/icons/png/paint_old-0.png" alt="">
+    <span class="win-title">Media_Studio.exe — Video Editing & Graphic Design Portfolio</span>
+    <div class="win-btns">
+      <div class="win-btn" onclick="minimizeWin('win-media')">_</div>
+      <div class="win-btn" onclick="maximizeWin('win-media')">□</div>
+      <div class="win-btn" onclick="closeWin('win-media')" style="font-weight:bold;margin-left:2px">✕</div>
+    </div>
+  </div>
+  <div class="win-menubar">
+    <span class="win-menu-item">File</span><span class="win-menu-item">View</span><span class="win-menu-item">Help</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="media-tabs">
+    <div class="media-tab active" id="mtab-video" onclick="switchMediaTab('video')">🎬 Video Reel</div>
+    <div class="media-tab" id="mtab-posters" onclick="switchMediaTab('posters')">🎨 Poster Gallery</div>
+    <div class="media-tab" id="mtab-about" onclick="switchMediaTab('about')">ℹ️ About My Work</div>
+  </div>
+
+  <!-- VIDEO TAB -->
+  <div id="mpanel-video" class="win-body" style="padding:8px;display:flex;flex-direction:column;gap:8px">
+    <div class="group-box" style="border-color:#6600aa;margin-bottom:6px">
+      <div class="group-label" style="background:var(--win-face);color:#6600aa">🎬 Video Editing Showcase</div>
+      <div style="font-size:11px;color:#333;line-height:1.6;margin-bottom:6px">
+        Skilled in editing videos for events, promos, and creative reels. Proficient with cutting, transitions, color grading, and motion text overlays.
+      </div>
+    </div>
+
+    <!-- Video player -->
+    <div class="video-chrome" id="video-container">
+      <!-- ═══ REPLACE THIS BLOCK WITH YOUR VIDEO ═══
+           Option A — Local file: <video controls style="width:100%;aspect-ratio:16/9;background:#000" src="your-video.mp4"></video>
+           Option B — YouTube embed: <iframe width="100%" style="aspect-ratio:16/9" src="https://www.youtube.com/embed/YOUR_VIDEO_ID" frameborder="0" allowfullscreen></iframe>
+           ════════════════════════════════════════ -->
+      <div class="video-placeholder" onclick="showVideoInstructions()">
+        <div class="play-btn-big">▶</div>
+        <div style="font-size:16px;letter-spacing:2px">VIDEO_REEL.mp4</div>
+        <div style="font-size:12px;color:#6677aa;max-width:320px;line-height:1.5">
+          📁 Replace this placeholder with your video.<br>
+          Click for instructions.
+        </div>
+        <!-- Animated scanline effect -->
+        <div style="position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#4488ff,transparent);animation:scanline 2s linear infinite"></div>
+      </div>
+    </div>
+
+    <!-- Video list -->
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <div style="font-size:10px;font-weight:bold;color:#444;margin-bottom:2px">VIDEO PROJECTS:</div>
+      <div class="video-list-item" onclick="selectVideo(this,'video1')" style="display:flex;align-items:center;gap:8px;padding:4px 6px;background:white;cursor:pointer;border-top:1px solid var(--win-darker);border-left:1px solid var(--win-darker);border-right:1px solid var(--win-light);border-bottom:1px solid var(--win-light)">
+        <span style="color:#6600aa;font-size:14px">▶</span>
+        <div>
+          <div style="font-weight:bold;font-size:11px">Event Documentation Reel</div>
+          <div style="font-size:10px;color:#666">00:00 | CapCut · Color Graded · Motion Text</div>
+        </div>
+      </div>
+      <div class="video-list-item" onclick="selectVideo(this,'video2')" style="display:flex;align-items:center;gap:8px;padding:4px 6px;background:white;cursor:pointer;border-top:1px solid var(--win-darker);border-left:1px solid var(--win-darker);border-right:1px solid var(--win-light);border-bottom:1px solid var(--win-light)">
+        <span style="color:#6600aa;font-size:14px">▶</span>
+        <div>
+          <div style="font-weight:bold;font-size:11px">Promotional / Announcement Video</div>
+          <div style="font-size:10px;color:#666">00:00 | Transitions · Text Animation</div>
+        </div>
+      </div>
+      <div class="video-list-item" onclick="selectVideo(this,'video3')" style="display:flex;align-items:center;gap:8px;padding:4px 6px;background:white;cursor:pointer;border-top:1px solid var(--win-darker);border-left:1px solid var(--win-darker);border-right:1px solid var(--win-light);border-bottom:1px solid var(--win-light)">
+        <span style="color:#6600aa;font-size:14px">▶</span>
+        <div>
+          <div style="font-weight:bold;font-size:11px">Creative Short Reel</div>
+          <div style="font-size:10px;color:#666">00:00 | Cinematic · LUT Applied</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- POSTERS TAB -->
+  <div id="mpanel-posters" class="win-body" style="padding:4px;display:none">
+    <div style="font-size:11px;color:#333;padding:4px 4px 6px;font-style:italic">Double-click any poster to view full-size. Add your poster images below.</div>
+    <div class="poster-grid">
+      <!-- Poster 1 — replace src with your image URL -->
+      <div class="poster-card" ondblclick="openLightbox('','Poster 1 — Event Design')">
+        <div class="poster-placeholder">
+          🎨
+          <span>Poster 1<br>Drop your image URL here</span>
+        </div>
+        <div class="poster-label">Event Poster · Canva</div>
+      </div>
+      <!-- Poster 2 -->
+      <div class="poster-card" ondblclick="openLightbox('','Poster 2 — Promotional')">
+        <div class="poster-placeholder">
+          📢
+          <span>Poster 2<br>Drop your image URL here</span>
+        </div>
+        <div class="poster-label">Promo Poster · Canva</div>
+      </div>
+      <!-- Poster 3 -->
+      <div class="poster-card" ondblclick="openLightbox('','Poster 3 — Announcement')">
+        <div class="poster-placeholder">
+          📣
+          <span>Poster 3<br>Drop your image URL here</span>
+        </div>
+        <div class="poster-label">Announcement · Typography</div>
+      </div>
+      <!-- Poster 4 -->
+      <div class="poster-card" ondblclick="openLightbox('','Poster 4 — Creative')">
+        <div class="poster-placeholder">
+          ✨
+          <span>Poster 4<br>Drop your image URL here</span>
+        </div>
+        <div class="poster-label">Creative Design · Layout</div>
+      </div>
+    </div>
+    <div style="background:#fff3cd;border:1px solid #ffc107;padding:6px 8px;margin:4px;font-size:10px">
+      💡 <b>To add your posters:</b> Upload images to a host (e.g. postimg.cc) and replace the <code>poster-placeholder</code> divs with <code>&lt;img src="YOUR_URL"&gt;</code> inside each <code>.poster-card</code>.
+    </div>
+  </div>
+
+  <!-- ABOUT TAB -->
+  <div id="mpanel-about" class="win-body" style="display:none;padding:10px">
+    <div class="group-box" style="border-color:#6600aa">
+      <div class="group-label" style="background:var(--win-face);color:#6600aa">About My Creative Work</div>
+      <div style="line-height:1.8;color:#222">
+        Beyond structural engineering, I channel creativity through <b>video editing</b> and <b>graphic design</b>. I've developed a strong eye for visual storytelling — knowing how to pace a video, choose the right transition, and use color to set the mood.
+        <br><br>
+        <b>Video Editing:</b> I work primarily in CapCut, producing everything from event documentation reels to short promotional clips. I enjoy the interplay of music, motion text, and color grading to produce content that feels cinematic even at a short runtime.
+        <br><br>
+        <b>Poster Design:</b> Using Canva as my primary tool, I design event posters, announcement materials, and social media graphics. I pay close attention to typography hierarchy, color harmony, and layout balance to create visually impactful outputs.
+        <br><br>
+        These creative skills complement my engineering work — giving me the ability to <i>communicate technical ideas visually</i> and produce professional presentation materials for projects.
+      </div>
+    </div>
+    <div class="group-box">
+      <div class="group-label">Tools & Software</div>
+      <table class="win98-table">
+        <tr><th>Tool</th><th>Purpose</th><th>Level</th></tr>
+        <tr><td>CapCut</td><td>Video editing, transitions, color</td><td><span class="badge badge-purple">Advanced</span></td></tr>
+        <tr><td>Canva</td><td>Poster & graphic design</td><td><span class="badge badge-teal">Advanced</span></td></tr>
+        <tr><td>VN Video Editor</td><td>Mobile video editing</td><td><span class="badge badge-purple">Proficient</span></td></tr>
+        <tr><td>Google Slides</td><td>Presentation design</td><td><span class="badge">Proficient</span></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="win-statusbar">
+    <div class="status-panel" id="media-status">Media Studio — Ready</div>
+    <div class="status-panel" style="max-width:120px">v9.0 MCHS</div>
+  </div>
+  <div class="win-resize" onmousedown="startResize(event,'win-media')"></div>
+</div>
+
+<!-- EXCEL RCD -->
+<div class="win" id="win-excel" style="width:620px;height:480px;top:50px;left:80px">
+  <div class="win-titlebar" onmousedown="startDrag(event,'win-excel')">
+    <img class="win-icon" src="https://win98icons.alexmeub.com/icons/png/ms_excel-0.png" alt="">
+    <span class="win-title">Microsoft Excel — BSCVE3C_RCD_Tool.xlsm</span>
+    <div class="win-btns">
+      <div class="win-btn" onclick="minimizeWin('win-excel')">_</div>
+      <div class="win-btn" onclick="maximizeWin('win-excel')">□</div>
+      <div class="win-btn" onclick="closeWin('win-excel')" style="font-weight:bold;margin-left:2px">✕</div>
+    </div>
+  </div>
+  <div class="win-menubar"><span class="win-menu-item">File</span><span class="win-menu-item">Edit</span><span class="win-menu-item">View</span><span class="win-menu-item">Insert</span><span class="win-menu-item">Format</span><span class="win-menu-item">Tools</span><span class="win-menu-item">Data</span><span class="win-menu-item">Help</span></div>
+  <div style="display:flex;gap:0;border-bottom:2px solid #808080;background:#c0c0c0;padding:2px 4px 0;overflow-x:auto;flex-shrink:0" id="excel-tabs">
+    <div class="xl-tab active" onclick="showSheet('dashboard')" id="tab-dashboard">Dashboard</div>
+    <div class="xl-tab" onclick="showSheet('prelim')" id="tab-prelim">Member Details</div>
+    <div class="xl-tab" onclick="showSheet('flexural')" id="tab-flexural">FLEXURAL</div>
+    <div class="xl-tab" onclick="showSheet('axial')" id="tab-axial">AXIAL</div>
+    <div class="xl-tab" onclick="showSheet('shear')" id="tab-shear">SHEAR</div>
+    <div class="xl-tab" onclick="showSheet('torsion')" id="tab-torsion">TORSION</div>
+    <div class="xl-tab" onclick="showSheet('beam')" id="tab-beam">BEAM</div>
+  </div>
+  <div class="win-body" style="padding:0;background:#fff;overflow:auto;font-family:'Courier New',monospace;font-size:11px">
+    <div id="sheet-dashboard" class="xl-sheet">
+      <div style="background:#1f3864;color:white;padding:10px 16px;font-size:13px;font-weight:bold;letter-spacing:1px">📘 RCD — PHILIPPINE CHRISTIAN UNIVERSITY - DASMARIÑAS</div>
+      <div style="background:#2e75b6;color:white;padding:6px 16px;font-size:11px">REINFORCED CONCRETE DESIGN TOOL &nbsp;|&nbsp; NSCP 2015 (ACI 318M-14) &nbsp;|&nbsp; BSCVE3C</div>
+      <div style="padding:12px 16px;line-height:1.8;font-family:var(--font);font-size:11px;color:#222">
+        <div style="margin-bottom:8px;font-weight:bold;color:#1f3864">DESIGN A STRUCTURAL MEMBER</div>
+        <div class="group-box" style="background:#eef4fb"><div class="group-label" style="background:#eef4fb">About This Tool</div>Welcome to the <b>Reinforced Concrete Design (RCD) Tool</b> — your interactive companion for mastering structural concrete design in accordance with the <b>National Structural Code of the Philippines (NSCP 2015)</b>. Built with intuitive navigation, this tool transforms complex NSCP provisions into practical, step-by-step calculations.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <div style="background:#dbe5f1;padding:8px;border-left:4px solid #2e75b6"><div style="font-weight:bold;color:#1f3864;margin-bottom:4px">📋 Sheets Included</div><div>✅ Dashboard & Navigation</div><div>✅ Member Preliminary Details</div><div>✅ Slab Tributary Distribution</div><div>✅ Beam Load & Deflection</div><div>✅ Column Axial Analysis</div><div>✅ Flexural Design (Rect + T)</div><div>✅ Shear & Torsion Design</div><div>✅ Results Summary + Print</div></div>
+          <div style="background:#dbe5f1;padding:8px;border-left:4px solid #2e75b6"><div style="font-weight:bold;color:#1f3864;margin-bottom:4px">⚙️ Key Features</div><div>🔹 Auto β₁ factor computation</div><div>🔹 φ strength reduction</div><div>🔹 PASS/FAIL conditional formatting</div><div>🔹 Balanced reinforcement checks</div><div>🔹 Philippine standard bar sizes</div><div>🔹 Singly & doubly reinforced beams</div><div>🔹 Short + long column design</div><div>🔹 Print-ready results sheet</div></div>
+        </div>
+      </div>
+    </div>
+    <div id="sheet-flexural" class="xl-sheet" style="display:none">
+      <div style="background:#1f3864;color:white;padding:6px 16px;font-size:12px;font-weight:bold">📐 FLEXURAL ANALYSIS — Rectangular &amp; T-Beam</div>
+      <div style="padding:10px;overflow:auto"><table class="win98-table" style="font-size:10px;min-width:560px"><thead><tr style="background:#dbe5f1"><th colspan="2" style="color:#1f3864;background:#dbe5f1">RECTANGULAR BEAM</th><th></th><th colspan="2" style="color:#1f3864;background:#dbe5f1">T-BEAM</th></tr><tr><th>Parameter</th><th>Value</th><th style="background:#c0c0c0"></th><th>Parameter</th><th>Value</th></tr></thead><tbody><tr><td>β₁ Factor</td><td>0.85</td><td></td><td>β₁ Factor</td><td>0.85</td></tr><tr><td>As<sub>min</sub></td><td>242.89 mm²</td><td></td><td>As<sub>min</sub></td><td>242.89 mm²</td></tr><tr><td>Required As</td><td>1930.43 mm²</td><td></td><td>As actual</td><td>1357.17 mm²</td></tr><tr><td>Provided As</td><td>1608.50 mm²</td><td></td><td>c<sub>max</sub></td><td>154.29 mm</td></tr><tr><td>a (stress block)</td><td>142.27 mm</td><td></td><td>a<sub>max</sub></td><td>131.14 mm</td></tr><tr><td>ε<sub>t</sub></td><td>0.00459</td><td></td><td>ε<sub>t</sub></td><td>0.02316 ✅</td></tr><tr><td>φ</td><td>0.90</td><td></td><td>φM<sub>n</sub></td><td>178.49 kN·m</td></tr><tr><td style="font-weight:bold">STATUS</td><td><span style="background:green;color:white;padding:1px 6px">✅ PASS</span></td><td></td><td style="font-weight:bold">STATUS</td><td><span style="background:red;color:white;padding:1px 6px">❌ FAIL</span></td></tr></tbody></table></div>
+    </div>
+    <div id="sheet-axial" class="xl-sheet" style="display:none">
+      <div style="background:#1f3864;color:white;padding:6px 16px;font-size:12px;font-weight:bold">🏛️ AXIAL ANALYSIS — Short &amp; Long Column Design</div>
+      <div style="padding:10px;overflow:auto"><table class="win98-table" style="font-size:10px;min-width:500px"><thead><tr><th colspan="2" style="background:#dbe5f1;color:#1f3864">SHORT COLUMN — SPIRAL</th><th></th><th colspan="2" style="background:#dbe5f1;color:#1f3864">SHORT COLUMN — TIED</th></tr><tr><th>Parameter</th><th>Value</th><th></th><th>Parameter</th><th>Value</th></tr></thead><tbody><tr><td>φPn (design)</td><td>1,941.40 kN</td><td></td><td>φPn (design)</td><td>1,739.63 kN</td></tr><tr><td>φ</td><td>0.75</td><td></td><td>φ</td><td>0.65</td></tr><tr><td>f'c</td><td>24 MPa</td><td></td><td>f'c</td><td>27.6 MPa</td></tr><tr><td style="font-weight:bold">STATUS</td><td><span style="background:green;color:white;padding:1px 6px">✅ PASS</span></td><td></td><td style="font-weight:bold">STATUS</td><td><span style="background:green;color:white;padding:1px 6px">✅ PASS</span></td></tr></tbody></table></div>
+    </div>
+    <div id="sheet-shear" class="xl-sheet" style="display:none"><div style="background:#1f3864;color:white;padding:6px 16px;font-size:12px;font-weight:bold">✂️ SHEAR DESIGN</div><div style="padding:12px;font-size:11px;line-height:1.9;color:#222"><div class="group-box" style="background:#eef4fb"><div class="group-label" style="background:#eef4fb">Design Parameters</div><div class="field-row"><span class="field-label">Method:</span><span>NSCP 2015 Section 422 — Stirrup shear design</span></div><div class="field-row"><span class="field-label">φ (shear):</span><span>0.75</span></div></div></div></div>
+    <div id="sheet-torsion" class="xl-sheet" style="display:none"><div style="background:#1f3864;color:white;padding:6px 16px;font-size:12px;font-weight:bold">🌀 TORSIONAL ANALYSIS</div><div style="padding:10px;overflow:auto"><table class="win98-table" style="font-size:10px;min-width:400px"><thead><tr><th>Parameter</th><th>Value</th><th>Unit</th></tr></thead><tbody><tr><td>A<sub>cp</sub></td><td>80,000</td><td>mm²</td></tr><tr><td>S required</td><td>41.22</td><td>mm</td></tr><tr><td>S max</td><td>104</td><td>mm</td></tr><tr><td>Stirrup Dia.</td><td>12 mm</td><td>φ</td></tr></tbody></table></div></div>
+    <div id="sheet-beam" class="xl-sheet" style="display:none"><div style="background:#1f3864;color:white;padding:6px 16px;font-size:12px;font-weight:bold">📏 BEAM LOAD DISTRIBUTION</div><div style="padding:10px;overflow:auto"><table class="win98-table" style="font-size:10px;min-width:580px"><thead><tr><th>Beam</th><th>Total Load (kN/m)</th><th>Length (m)</th><th>Type</th><th>Deflection (mm)</th></tr></thead><tbody><tr><td>B'-C'</td><td>22.73</td><td>5.54</td><td>Trapezoidal</td><td>5.293</td></tr><tr><td>C'-D'</td><td>20.30</td><td>4.26</td><td>Trapezoidal</td><td>1.653</td></tr><tr style="background:#fff3cd"><td><b>B'-C' (critical)</b></td><td><b>22.73</b></td><td><b>5.54</b></td><td><b>Trapezoidal</b></td><td><b style="color:red">5.293 ← MAX</b></td></tr></tbody></table></div></div>
+    <div id="sheet-prelim" class="xl-sheet" style="display:none"><div style="background:#1f3864;color:white;padding:6px 16px;font-size:12px;font-weight:bold">📋 MEMBER PRELIMINARY DETAILS</div><div style="padding:10px;overflow:auto"><table class="win98-table" style="font-size:10px;min-width:480px"><thead><tr><th>Floor</th><th>Load Type</th><th>Component</th><th>Load (kPa)</th></tr></thead><tbody><tr><td rowspan="4">GF</td><td rowspan="3">Dead</td><td>Acoustical Fiber Board</td><td>0.05</td></tr><tr><td>Suspended Steel Channel</td><td>0.10</td></tr><tr><td>Marble + Mortar</td><td>1.58</td></tr><tr><td colspan="2" style="font-weight:bold">GF Ultimate Wu</td><td><b>11.74 kPa</b></td></tr><tr><td rowspan="2">2F</td><td colspan="2" style="font-weight:bold">2F Total Dead</td><td>8.16</td></tr><tr><td colspan="2" style="font-weight:bold">2F Ultimate Wu</td><td><b>18.67 kPa</b></td></tr></tbody></table></div></div>
+  </div>
+  <div class="win-statusbar">
+    <div class="status-panel" id="excel-status">Sheet: Dashboard — BSCVE3C RCD Tool</div>
+    <div class="status-panel" style="max-width:100px">Ready</div>
+  </div>
+  <div class="win-resize" onmousedown="startResize(event,'win-excel')"></div>
+</div>
+
+<!-- ═══════════ TASKBAR ═══════════ -->
+<div id="taskbar">
+  <div id="start-btn" onclick="toggleStart()">
+    <img src="https://win98icons.alexmeub.com/icons/png/windows-0.png" alt=""><b>Start</b>
+  </div>
+  <div class="taskbar-sep"></div>
+  <div id="taskbar-btns" style="display:flex;gap:3px;flex:1;overflow:hidden"></div>
+  <div id="taskbar-tray">
+    <span>🔊</span>
+    <span id="clock">00:00 AM</span>
+  </div>
+</div>
+
+<!-- START MENU -->
+<div id="start-menu">
+  <div id="start-menu-sidebar"><span>Windows 98</span></div>
+  <div id="start-menu-items">
+    <div class="start-item" onclick="openWin('about');closeStart()"><img src="https://win98icons.alexmeub.com/icons/png/user_world-0.png" alt=""> About Me</div>
+    <div class="start-item" onclick="openWin('skills');closeStart()"><img src="https://win98icons.alexmeub.com/icons/png/settings_app-0.png" alt=""> Skills</div>
+    <div class="start-item" onclick="openWin('projects');closeStart()"><img src="https://win98icons.alexmeub.com/icons/png/ms_excel-0.png" alt=""> Projects</div>
+    <div class="start-item" onclick="openWin('honors');closeStart()"><img src="https://win98icons.alexmeub.com/icons/png/certificate_2-0.png" alt=""> Honors</div>
+    <div class="start-item" onclick="openWin('timeline');closeStart()"><img src="https://win98icons.alexmeub.com/icons/png/calendar-0.png" alt=""> Timeline</div>
+    <div class="start-item" onclick="openWin('contact');closeStart()"><img src="https://win98icons.alexmeub.com/icons/png/mailnews-0.png" alt=""> Contact</div>
+    <div class="start-sep"></div>
+    <div class="start-item" onclick="openWin('media');closeStart()"><img src="https://win98icons.alexmeub.com/icons/png/paint_old-0.png" alt=""> 🎬 Media Studio</div>
+    <div class="start-item" onclick="openWin('excel');closeStart()"><img src="https://win98icons.alexmeub.com/icons/png/ms_excel-0.png" alt=""> RCD Tool.xlsm</div>
+    <div class="start-item" onclick="openWin('viewer3d');closeStart()"><img src="https://win98icons.alexmeub.com/icons/png/paint_old-0.png" alt=""> 3D Projects</div>
+    <div class="start-item" onclick="openWin('notepad');closeStart()"><img src="https://win98icons.alexmeub.com/icons/png/notepad-0.png" alt=""> README.txt</div>
+    <div class="start-sep"></div>
+    <div class="start-item" onclick="triggerBsod();closeStart()"><img src="https://win98icons.alexmeub.com/icons/png/recycle_bin_empty-0.png" alt=""> Shut Down...</div>
+  </div>
+</div>
+
+<!-- BSOD -->
+<div id="bsod" onclick="document.getElementById('bsod').style.display='none'">
+  <br>
+  A fatal exception 0E has occurred at 0028:C0011E36 in VXD VMM(01) +<br>
+  00010E36. The current application will be terminated.<br><br>
+  *  Press any key to terminate the current application.<br>
+  *  Press CTRL+ALT+DEL to restart your computer. You will<br>
+     lose any unsaved information in all applications.<br><br>
+  <span class="blink">Press any key to continue _</span><br><br><br>
+  <div style="font-size:14px;color:#aaaaff">[ MCHS Portfolio OS v9 — Easter Egg! Click anywhere to return. ]</div>
+</div>
+
+<!-- LIGHTBOX -->
+<div id="lightbox" onclick="closeLightbox()">
+  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="">
+  <div id="lightbox-caption"></div>
+</div>
+
+<!-- VIDEO INSTRUCTIONS DIALOG -->
+<div id="video-instructions" style="display:none;position:fixed;inset:0;z-index:80000;background:rgba(0,0,0,0.7);align-items:center;justify-content:center">
+  <div style="background:var(--win-face);border-top:2px solid var(--win-light);border-left:2px solid var(--win-light);border-right:2px solid var(--win-darker);border-bottom:2px solid var(--win-darker);width:420px;box-shadow:4px 6px 16px rgba(0,0,0,0.6)">
+    <div style="background:linear-gradient(90deg,#000080,#1084d0);color:white;font-weight:bold;padding:3px 8px;font-size:11px;display:flex;justify-content:space-between;align-items:center">
+      <span>📋 How to Add Your Video</span>
+      <span style="cursor:pointer;font-size:14px" onclick="document.getElementById('video-instructions').style.display='none'">✕</span>
+    </div>
+    <div style="padding:14px;font-size:11px;line-height:1.9">
+      <b>Option A — YouTube / Google Drive link:</b><br>
+      In the HTML, find <code>id="video-container"</code> and replace the placeholder div with:<br>
+      <code style="background:#eee;padding:2px 4px;display:block;margin:4px 0">&lt;iframe width="100%" style="aspect-ratio:16/9" src="https://www.youtube.com/embed/YOUR_ID" frameborder="0" allowfullscreen&gt;&lt;/iframe&gt;</code>
+      <br>
+      <b>Option B — Direct MP4 file:</b><br>
+      Host your .mp4 (e.g. on Google Drive or postimg) and use:<br>
+      <code style="background:#eee;padding:2px 4px;display:block;margin:4px 0">&lt;video controls style="width:100%;aspect-ratio:16/9;background:#000" src="YOUR_DIRECT_LINK.mp4"&gt;&lt;/video&gt;</code>
+      <br>
+      <b>Poster images:</b> In the Poster Gallery tab, upload images to <a href="https://postimg.cc" target="_blank" style="color:#000080">postimg.cc</a> and replace the placeholder divs with <code>&lt;img src="URL"&gt;</code>.
+    </div>
+    <div style="padding:0 14px 12px;display:flex;justify-content:flex-end">
+      <button class="submit-btn" onclick="document.getElementById('video-instructions').style.display='none'">OK, Got it!</button>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+<style>@keyframes scanline{0%{left:-20%}100%{left:120%}}</style>
+
+<script>
+// ══════════════════════════════════════════════
+// BOOT SEQUENCE
+// ══════════════════════════════════════════════
+const bootLines = [
+  'Initializing MCHS Engineering OS v9...',
+  'Loading kernel modules [CE.sys]...',
+  'Mounting portfolio filesystem...',
+  'Registering media drivers [VideoEdit.drv]...',
+  'Starting window manager...',
+  'Loading user profile [Mark_Silos.dat]...',
+  'Applying theme [Win98_Blue.theme]...',
+  'All systems operational. Welcome.',
+];
+let bootIdx = 0, bootPct = 0;
+const bootLog = document.getElementById('boot-log');
+const bootBar = document.getElementById('boot-bar');
+const bootPctEl = document.getElementById('boot-pct');
+
+function bootStep() {
+  if (bootIdx < bootLines.length) {
+    const line = document.createElement('div');
+    line.textContent = '> ' + bootLines[bootIdx];
+    bootLog.appendChild(line);
+    bootIdx++;
+    const targetPct = Math.round((bootIdx / bootLines.length) * 100);
+    const interval = setInterval(() => {
+      bootPct = Math.min(bootPct + 2, targetPct);
+      bootBar.style.width = bootPct + '%';
+      bootPctEl.textContent = bootPct + '%';
+      if (bootPct >= targetPct) clearInterval(interval);
+    }, 18);
+    setTimeout(bootStep, bootIdx < bootLines.length ? 380 : 600);
+  } else {
+    setTimeout(() => {
+      document.getElementById('boot-screen').classList.add('hide');
+      document.getElementById('desktop').classList.add('show');
+      setTimeout(() => {
+        document.getElementById('boot-screen').style.display = 'none';
+        // Auto-open windows
+        setTimeout(() => openWin('about'), 200);
+        setTimeout(() => openWin('notepad'), 500);
+        setTimeout(() => openWin('media'), 900);
+      }, 700);
+    }, 400);
+  }
+}
+setTimeout(bootStep, 400);
+
+// ══════════════════════════════════════════════
+// PARTICLE CANVAS
+// ══════════════════════════════════════════════
+const canvas = document.getElementById('particle-canvas');
+const ctx = canvas.getContext('2d');
+let particles = [];
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight - 28;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+for (let i = 0; i < 55; i++) {
+  particles.push({
+    x: Math.random() * window.innerWidth,
+    y: Math.random() * (window.innerHeight - 28),
+    r: Math.random() * 1.5 + 0.4,
+    vx: (Math.random() - 0.5) * 0.3,
+    vy: (Math.random() - 0.5) * 0.3,
+    alpha: Math.random() * 0.5 + 0.2,
+  });
+}
+
+function drawParticles() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  particles.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${p.alpha})`;
+    ctx.fill();
+    p.x += p.vx; p.y += p.vy;
+    if (p.x < 0) p.x = canvas.width;
+    if (p.x > canvas.width) p.x = 0;
+    if (p.y < 0) p.y = canvas.height;
+    if (p.y > canvas.height) p.y = 0;
+  });
+  requestAnimationFrame(drawParticles);
+}
+drawParticles();
+
+// ══════════════════════════════════════════════
+// Z-INDEX & WINDOW MANAGEMENT
+// ══════════════════════════════════════════════
+let topZ = 100;
+const winStates = {};
+const winIcons = {
+  'win-about':    'https://win98icons.alexmeub.com/icons/png/user_world-0.png',
+  'win-skills':   'https://win98icons.alexmeub.com/icons/png/settings_app-0.png',
+  'win-projects': 'https://win98icons.alexmeub.com/icons/png/ms_excel-0.png',
+  'win-honors':   'https://win98icons.alexmeub.com/icons/png/certificate_2-0.png',
+  'win-timeline': 'https://win98icons.alexmeub.com/icons/png/calendar-0.png',
+  'win-contact':  'https://win98icons.alexmeub.com/icons/png/mailnews-0.png',
+  'win-viewer3d': 'https://win98icons.alexmeub.com/icons/png/paint_old-0.png',
+  'win-notepad':  'https://win98icons.alexmeub.com/icons/png/notepad-0.png',
+  'win-excel':    'https://win98icons.alexmeub.com/icons/png/ms_excel-0.png',
+  'win-media':    'https://win98icons.alexmeub.com/icons/png/paint_old-0.png',
+};
+const winNames = {
+  'win-about':    'About Me',
+  'win-skills':   'Skills',
+  'win-projects': 'Projects',
+  'win-honors':   'Honors',
+  'win-timeline': 'Timeline',
+  'win-contact':  'Contact',
+  'win-viewer3d': '3D Projects',
+  'win-notepad':  'README.txt',
+  'win-excel':    'RCD Tool.xlsm',
+  'win-media':    '🎬 Media Studio',
+};
+
+function bringToFront(id) {
+  topZ++;
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.zIndex = topZ;
+  document.querySelectorAll('.win').forEach(w => w.classList.add('inactive'));
+  el.classList.remove('inactive');
+  const btn = document.getElementById('tbtn-' + id);
+  if (btn) { document.querySelectorAll('.task-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
+}
+
+function openWin(name) {
+  closeStart();
+  const id = 'win-' + name;
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.classList.contains('visible') && !el.classList.contains('minimized')) {
+    bringToFront(id); return;
+  }
+  el.classList.remove('minimized');
+  el.classList.add('visible');
+  if (!winStates[id]) {
+    winStates[id] = { minimized: false, maximized: false };
+    const tw = window.innerWidth, th = window.innerHeight - 28;
+    const w = el.offsetWidth || 400, h = el.offsetHeight || 300;
+    el.style.left = Math.max(0, Math.floor(tw/2 - w/2 + (Math.random()-0.5)*100)) + 'px';
+    el.style.top  = Math.max(0, Math.floor(th/2 - h/2 + (Math.random()-0.5)*70)) + 'px';
+  }
+  bringToFront(id);
+  addTaskBtn(id);
+}
+
+function closeWin(id) {
+  const el = document.getElementById(id);
+  el.classList.remove('visible','minimized');
+  winStates[id] = null;
+  removeTaskBtn(id);
+}
+
+function minimizeWin(id) {
+  const el = document.getElementById(id);
+  el.classList.add('minimized');
+  winStates[id] = winStates[id] || {};
+  winStates[id].minimized = true;
+  const btn = document.getElementById('tbtn-' + id);
+  if (btn) btn.classList.remove('active');
+}
+
+const savedGeom = {};
+function maximizeWin(id) {
+  const el = document.getElementById(id);
+  const st = winStates[id] || {};
+  if (!st.maximized) {
+    savedGeom[id] = { l: el.style.left, t: el.style.top, w: el.style.width, h: el.style.height };
+    el.style.left = '0'; el.style.top = '0';
+    el.style.width = '100%'; el.style.height = (window.innerHeight - 28) + 'px';
+    st.maximized = true;
+  } else {
+    const g = savedGeom[id] || {};
+    el.style.left = g.l || '60px'; el.style.top = g.t || '60px';
+    el.style.width = g.w || ''; el.style.height = g.h || '';
+    st.maximized = false;
+  }
+  winStates[id] = st;
+  bringToFront(id);
+}
+
+// ══════════════════════════════════════════════
+// TASKBAR BUTTONS
+// ══════════════════════════════════════════════
+function addTaskBtn(id) {
+  if (document.getElementById('tbtn-' + id)) {
+    document.querySelectorAll('.task-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tbtn-' + id).classList.add('active');
+    return;
+  }
+  const btn = document.createElement('div');
+  btn.className = 'task-btn active';
+  btn.id = 'tbtn-' + id;
+  const img = document.createElement('img');
+  img.src = winIcons[id] || '';
+  btn.appendChild(img);
+  btn.appendChild(document.createTextNode(winNames[id] || id));
+  btn.onclick = () => {
+    const el = document.getElementById(id);
+    if (el.classList.contains('minimized')) {
+      el.classList.remove('minimized');
+      bringToFront(id);
+      btn.classList.add('active');
+    } else {
+      minimizeWin(id);
+    }
+  };
+  document.getElementById('taskbar-btns').appendChild(btn);
+}
+function removeTaskBtn(id) {
+  const btn = document.getElementById('tbtn-' + id);
+  if (btn) btn.remove();
+}
+
+// ══════════════════════════════════════════════
+// DRAG
+// ══════════════════════════════════════════════
+let dragging = null, dragOffX = 0, dragOffY = 0;
+function startDrag(e, id) {
+  if (e.target.classList.contains('win-btn')) return;
+  dragging = id;
+  const el = document.getElementById(id);
+  const r = el.getBoundingClientRect();
+  dragOffX = e.clientX - r.left;
+  dragOffY = e.clientY - r.top;
+  bringToFront(id);
+  e.preventDefault();
+}
+document.addEventListener('mousemove', e => {
+  if (dragging) {
+    const el = document.getElementById(dragging);
+    el.style.left = (e.clientX - dragOffX) + 'px';
+    el.style.top  = Math.max(0, Math.min(e.clientY - dragOffY, window.innerHeight - 48)) + 'px';
+  }
+  if (resizing) doResize(e);
+});
+document.addEventListener('mouseup', () => { dragging = null; resizing = null; });
+
+// ══════════════════════════════════════════════
+// RESIZE
+// ══════════════════════════════════════════════
+let resizing = null, rsX = 0, rsY = 0, rsW = 0, rsH = 0;
+function startResize(e, id) {
+  resizing = id; rsX = e.clientX; rsY = e.clientY;
+  const el = document.getElementById(id);
+  rsW = el.offsetWidth; rsH = el.offsetHeight;
+  e.stopPropagation(); e.preventDefault();
+}
+function doResize(e) {
+  const el = document.getElementById(resizing);
+  el.style.width  = Math.max(280, rsW + (e.clientX - rsX)) + 'px';
+  el.style.height = Math.max(120, rsH + (e.clientY - rsY)) + 'px';
+}
+
+// ══════════════════════════════════════════════
+// CLOCK
+// ══════════════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  let h = now.getHours(), m = now.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  document.getElementById('clock').textContent = h + ':' + String(m).padStart(2,'0') + ' ' + ampm;
+}
+updateClock(); setInterval(updateClock, 1000);
+
+// ══════════════════════════════════════════════
+// START MENU
+// ══════════════════════════════════════════════
+function toggleStart() {
+  const m = document.getElementById('start-menu');
+  const b = document.getElementById('start-btn');
+  if (m.classList.contains('open')) { m.classList.remove('open'); b.classList.remove('active'); }
+  else { m.classList.add('open'); b.classList.add('active'); }
+}
+function closeStart() {
+  document.getElementById('start-menu').classList.remove('open');
+  document.getElementById('start-btn').classList.remove('active');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#start-menu') && !e.target.closest('#start-btn')) closeStart();
+});
+
+// ══════════════════════════════════════════════
+// ICON SELECTION
+// ══════════════════════════════════════════════
+function selectIcon(el) {
+  document.querySelectorAll('.desktop-icon').forEach(i => i.classList.remove('selected'));
+  el.classList.add('selected');
+}
+document.getElementById('desktop').addEventListener('click', e => {
+  if (!e.target.closest('.desktop-icon')) document.querySelectorAll('.desktop-icon').forEach(i => i.classList.remove('selected'));
+});
+document.addEventListener('mousedown', e => {
+  const win = e.target.closest('.win');
+  if (win) bringToFront(win.id);
+});
+
+// ══════════════════════════════════════════════
+// EXCEL SHEETS
+// ══════════════════════════════════════════════
+function showSheet(name) {
+  document.querySelectorAll('.xl-sheet').forEach(s => s.style.display = 'none');
+  document.querySelectorAll('.xl-tab').forEach(t => t.classList.remove('active'));
+  const sheet = document.getElementById('sheet-' + name);
+  const tab   = document.getElementById('tab-' + name);
+  if (sheet) sheet.style.display = 'block';
+  if (tab)   tab.classList.add('active');
+  const labels = { dashboard:'Dashboard',prelim:'Member Details',flexural:'FLEXURAL',axial:'AXIAL',shear:'SHEAR',torsion:'TORSION',beam:'BEAM' };
+  const s = document.getElementById('excel-status');
+  if (s) s.textContent = 'Sheet: ' + (labels[name] || name) + ' — BSCVE3C RCD Tool';
+}
+
+// ══════════════════════════════════════════════
+// 3D IMAGE VIEWER
+// ══════════════════════════════════════════════
+const imgs = [
+  { src:'https://i.postimg.cc/D0rQ9YxH/image.png', cap:'BSD Residential Project — View 1 | SketchUp 3D Model' },
+  { src:'https://i.postimg.cc/NMTRXzv1/image.png', cap:'BSD Residential Project — View 2 | SketchUp 3D Model' },
+  { src:'https://i.postimg.cc/zXqTL7t7/image.png', cap:'BSD Residential Project — View 3 | SketchUp 3D Model' },
+  { src:'https://i.postimg.cc/B6x1bP2X/image.png', cap:'BSD Residential Project — View 4 | SketchUp 3D Model' },
+];
+let imgIdx = 0;
+function updateViewer() {
+  document.getElementById('viewer-img').src = imgs[imgIdx].src;
+  document.getElementById('img-caption').textContent = imgs[imgIdx].cap;
+  document.getElementById('img-counter').textContent = (imgIdx+1) + ' / ' + imgs.length;
+}
+function prevImg() { imgIdx = (imgIdx-1+imgs.length)%imgs.length; updateViewer(); }
+function nextImg() { imgIdx = (imgIdx+1)%imgs.length; updateViewer(); }
+
+// ══════════════════════════════════════════════
+// MEDIA STUDIO
+// ══════════════════════════════════════════════
+function switchMediaTab(tab) {
+  ['video','posters','about'].forEach(t => {
+    document.getElementById('mpanel-'+t).style.display = 'none';
+    document.getElementById('mtab-'+t).classList.remove('active');
+  });
+  document.getElementById('mpanel-'+tab).style.display = '';
+  document.getElementById('mtab-'+tab).classList.add('active');
+  const labels = { video:'Video Reel — Ready to load your MP4', posters:'Poster Gallery — Add your designs', about:'About My Creative Work' };
+  document.getElementById('media-status').textContent = labels[tab] || 'Media Studio';
+}
+
+function showVideoInstructions() {
+  document.getElementById('video-instructions').style.display = 'flex';
+}
+
+function selectVideo(el, id) {
+  document.querySelectorAll('.video-list-item').forEach(v => v.style.background = 'white');
+  el.style.background = '#dbe5f1';
+}
+
+// ══════════════════════════════════════════════
+// LIGHTBOX
+// ══════════════════════════════════════════════
+function openLightbox(src, caption) {
+  const lb = document.getElementById('lightbox');
+  const img = document.getElementById('lightbox-img');
+  if (src) { img.src = src; img.style.display = 'block'; }
+  else      { img.style.display = 'none'; }
+  document.getElementById('lightbox-caption').textContent = caption || '';
+  lb.classList.add('open');
+}
+function closeLightbox() { document.getElementById('lightbox').classList.remove('open'); }
+
+// ══════════════════════════════════════════════
+// CONTACT
+// ══════════════════════════════════════════════
+function sendContact() {
+  const from = document.getElementById('contact-from').value.trim();
+  const subj = document.getElementById('contact-subject').value.trim();
+  const msg  = document.getElementById('contact-msg').value.trim();
+  if (!from || !msg) { document.getElementById('contact-status').textContent = 'Error: Name and message required.'; return; }
+  const mailto = 'mailto:markchristiansilos123@gmail.com?subject=' + encodeURIComponent(subj||'Portfolio Inquiry') + '&body=' + encodeURIComponent('From: '+from+'\n\n'+msg);
+  window.open(mailto);
+  document.getElementById('contact-status').textContent = 'Message queued — opening mail client...';
+}
+function clearContact() {
+  ['contact-from','contact-subject','contact-msg'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('contact-status').textContent = 'Ready to compose';
+}
+
+// ══════════════════════════════════════════════
+// BSOD
+// ══════════════════════════════════════════════
+function triggerBsod() {
+  document.getElementById('bsod').style.display = 'block';
+  document.addEventListener('keydown', () => document.getElementById('bsod').style.display='none', { once:true });
+}
+
+// ══════════════════════════════════════════════
+// KONAMI CODE EASTER EGG
+// ══════════════════════════════════════════════
+const konami = [38,38,40,40,37,39,37,39,66,65];
+let konamiIdx = 0;
+document.addEventListener('keydown', e => {
+  if (e.keyCode === konami[konamiIdx]) {
+    konamiIdx++;
+    if (konamiIdx === konami.length) { konamiIdx = 0; triggerBsod(); }
+  } else { konamiIdx = 0; }
+});
+</script>
+</body>
+</html>
